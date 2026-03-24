@@ -94,9 +94,13 @@ async def main():
         user = message.from_user
         logger.info(f"👤 {user.username} запустил бота")
         
+        # Получаем информацию о модели
+        ai_client = get_ai_client()
+        model_info = ai_client.get_stats()
+
         text = (
             f"👋 <b>Привет, {user.first_name}!</b>\n\n"
-            f"Я AI-бот на базе <b>Google Gemini {MODEL_NAME}</b> 🤖\n\n"
+            f"Я AI-бот на базе <b>Google Gemini {model_info['model']}</b> 🤖\n\n"
             f"Могу ответить на вопросы, помочь с идеями или просто поболтать!\n\n"
             f"<b>Команды:</b>\n"
             f"/start - Запустить бота\n"
@@ -114,22 +118,27 @@ async def main():
     
     @dp.message(Command("about"))
     async def cmd_about(message: types.Message):
+        ai_client = get_ai_client()
+        stats = ai_client.get_stats()
+        
         text = (
             f"<b>🤖 AI ChatBot</b>\n\n"
-            f"Модель: {MODEL_NAME}\n"
+            f"Модель: {stats['model']}\n"
             f"Активных чатов: {len(chat_sessions)}\n\n"
             f"<i>Google Gemini API (бесплатно)</i>"
         )
         await message.answer(text)
-    
+
     @dp.callback_query(F.data == "clear_history")
     async def cb_clear(callback: types.CallbackQuery):
         chat_sessions[callback.from_user.id] = []
         await callback.answer("🗑 История очищена!", show_alert=True)
-    
+
     @dp.callback_query(F.data == "about")
     async def cb_about(callback: types.CallbackQuery):
-        text = f"<b>AI ChatBot</b>\n\nМодель: {MODEL_NAME}\nЧатов: {len(chat_sessions)}"
+        ai_client = get_ai_client()
+        stats = ai_client.get_stats()
+        text = f"<b>AI ChatBot</b>\n\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
         await callback.message.answer(text)
     
     @dp.message(F.text)
