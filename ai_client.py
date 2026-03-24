@@ -55,18 +55,25 @@ class AIClient:
                 genai.configure(api_key=self.api_key)
                 
                 # Пробуем доступные модели по порядку
+                self.model = None
                 self.model_name = None
-                for model in ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-pro"]:
+                
+                # Порядок: gemini-pro (стабильная), затем новые
+                for model_name in ["gemini-pro", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
                     try:
-                        self.model = genai.GenerativeModel(model)
-                        self.model_name = model
-                        logger.info(f"✅ Gemini модель {model} доступна")
+                        logger.info(f"  Проверяю модель {model_name}...")
+                        self.model = genai.GenerativeModel(model_name)
+                        # Тестовый запрос
+                        test_response = self.model.generate_content("Hi", generation_config=genai.types.GenerationConfig(max_output_tokens=10))
+                        self.model_name = model_name
+                        logger.info(f"✅ Модель {model_name} доступна")
                         break
-                    except:
+                    except Exception as e:
+                        logger.warning(f"  Модель {model_name} недоступна: {e}")
                         continue
                 
                 if not self.model_name:
-                    raise ValueError("Ни одна модель Gemini не доступна")
+                    raise ValueError("Ни одна модель Gemini не доступна. Проверьте API ключ.")
             else:
                 raise ImportError("google-generativeai не установлен")
                 
