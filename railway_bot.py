@@ -1,6 +1,6 @@
 """
-AI ChatBot для Railway - только Telegram бот.
-Использует GigaChat (Сбер) - работает в РФ!
+AI ChatBot для Railway - Telegram бот.
+Использует Groq (США) + GigaChat (Россия) - работает в РФ!
 """
 
 import asyncio
@@ -25,6 +25,7 @@ logger = logging.getLogger("RailwayBot")
 
 # Проверка переменных
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
@@ -33,9 +34,9 @@ if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
     sys.exit(1)
 
-if not GIGACHAT_AUTH_KEY:
-    logger.error("❌ GIGACHAT_AUTH_KEY не найден!")
-    logger.info("Получите токен: https://developers.sber.ru/gigachat")
+if not GROQ_API_KEY:
+    logger.error("❌ GROQ_API_KEY не найден!")
+    logger.info("Получите ключ: https://console.groq.com/keys")
     sys.exit(1)
 
 # Импорты после проверки
@@ -47,15 +48,29 @@ from aiogram.enums import ParseMode
 
 from ai_client import init_ai, get_ai_client
 
-# Инициализация GigaChat с OAuth
-init_ai(
-    provider="gigachat",
-    auth_key=GIGACHAT_AUTH_KEY,
-    client_id=GIGACHAT_CLIENT_ID,
-    scope=GIGACHAT_SCOPE
-)
+# Инициализация AI - Groq (основной) + GigaChat (резерв)
+try:
+    init_ai(
+        provider="groq",
+        api_key=GROQ_API_KEY
+    )
+    logger.info("✅ Groq (США) инициализирован - основная модель")
+except Exception as e:
+    logger.warning(f"Groq не доступен: {e}")
+    if GIGACHAT_AUTH_KEY:
+        init_ai(
+            provider="gigachat",
+            auth_key=GIGACHAT_AUTH_KEY,
+            client_id=GIGACHAT_CLIENT_ID,
+            scope=GIGACHAT_SCOPE
+        )
+        logger.info("✅ GigaChat (Россия) инициализирован - резервная модель")
+    else:
+        logger.error("❌ Нет доступных AI моделей!")
+        sys.exit(1)
+
 ai = get_ai_client()
-logger.info(f"✅ AI модель {ai.model} ({ai.provider}) инициализирована")
+logger.info(f"✅ AI модель {ai.model} ({ai.provider}) активна")
 
 # Хранилище сессий
 chat_sessions = {}
@@ -76,11 +91,21 @@ def create_inline_keyboard() -> types.InlineKeyboardMarkup:
     return builder.as_markup()
 
 async def ask_ai(user_id: int, message: str) -> str:
-    """Запрос к AI (GigaChat)."""
+    """Запрос к AI (Groq основной, GigaChat резерв)."""
     try:
         client = get_ai_client()
-        # GigaChat использует синхронный метод
-        return client.ask(user_id, message, SYSTEM_PROMPT)
+        
+        # Groq использует асинхронный запрос через requests
+        if client.provider == "groq":
+            return client._ask_groq(
+                client.get_session(user_id),
+                message,
+                SYSTEM_PROMPT
+            )
+        else:
+            # GigaChat синхронный
+            return client.ask(user_id, message, SYSTEM_PROMPT)
+            
     except Exception as e:
         logger.error(f"Ошибка AI: {e}")
         return "Произошла ошибка. Попробуйте позже или используйте /clear"
@@ -105,10 +130,16 @@ async def main():
         # Получаем информацию о модели
         ai_client = get_ai_client()
         model_info = ai_client.get_stats()
+        
+        # Определяем описание модели
+        if model_info['provider'] == 'groq':
+            model_desc = "Groq (США) 🇺🇸 + GigaChat (Россия) 🇷🇺"
+        else:
+            model_desc = "GigaChat (Россия) 🇷🇺"
 
         text = (
             f"👋 <b>Привет, {user.first_name}!</b>\n\n"
-            f"Я AI-бот на базе <b>GigaChat (Сбер)</b> 🤖\n\n"
+            f"Я AI-бот на базе <b>{model_desc}</b> 🤖\n\n"
             f"Могу ответить на вопросы, помочь с идеями или просто поболтать!\n\n"
             f"<b>Команды:</b>\n"
             f"/start - Запустить бота\n"
@@ -129,12 +160,21 @@ async def main():
         ai_client = get_ai_client()
         stats = ai_client.get_stats()
         
+        # Описание провайдера
+        if stats['provider'] == 'groq':
+            provider_desc = "Groq (США) 🇺🇸 | Llama 3.1"
+            backup_desc = "Резерв: GigaChat (Россия) 🇷🇺"
+        else:
+            provider_desc = "GigaChat (Россия) 🇷🇺"
+            backup_desc = ""
+        
         text = (
             f"<b>🤖 AI ChatBot</b>\n\n"
             f"Модель: {stats['model']}\n"
-            f"Провайдер: {stats['provider']}\n"
+            f"Провайдер: {provider_desc}\n"
+            f"{backup_desc}\n"
             f"Активных чатов: {len(chat_sessions)}\n\n"
-            f"<i>GigaChat API (Сбер, РФ)</i>"
+            f"<i>🇺🇸🇷🇺 Американская + Российская модели</i>"
         )
         await message.answer(text)
 
@@ -147,26 +187,44 @@ async def main():
     async def cb_about(callback: types.CallbackQuery):
         ai_client = get_ai_client()
         stats = ai_client.get_stats()
-        text = f"<b>AI ChatBot</b>\n\nМодель: {stats['model']}\nПровайдер: {stats['provider']}\nЧатов: {len(chat_sessions)}"
+        
+        if stats['provider'] == 'groq':
+            text = f"<b>AI ChatBot</b>\n\n🇺🇸 Groq (США)\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
+        else:
+            text = f"<b>AI ChatBot</b>\n\n🇷🇺 GigaChat (Россия)\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
+        
         await callback.message.answer(text)
     
     @dp.message(F.text)
     async def handle_message(message: types.Message):
         user = message.from_user
         user_text = message.text
-        
+
         logger.info(f"💬 {user.username}: {user_text[:50]}...")
-        
+
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
-        
-        response = await ask_ai(user.id, user_text)
-        
+
+        # Groq синхронный, поэтому не используем await
+        try:
+            client = get_ai_client()
+            if client.provider == "groq":
+                response = client._ask_groq(
+                    client.get_session(user.id),
+                    user_text,
+                    SYSTEM_PROMPT
+                )
+            else:
+                response = client.ask(user.id, user_text, SYSTEM_PROMPT)
+        except Exception as e:
+            logger.error(f"Ошибка AI: {e}")
+            response = "Произошла ошибка. Используйте /clear"
+
         # Разбиваем длинные ответы
         max_len = 4000
         for i in range(0, len(response), max_len):
             chunk = response[i:i + max_len]
             await message.answer(chunk, reply_markup=create_inline_keyboard())
-        
+
         logger.info(f"✅ Ответ отправлен")
     
     # Запуск
