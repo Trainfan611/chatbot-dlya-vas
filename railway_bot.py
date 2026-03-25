@@ -80,14 +80,13 @@ SYSTEM_PROMPT = "Ты полезный ассистент AI. Отвечай к�
 def create_main_keyboard() -> types.ReplyKeyboardMarkup:
     kb = [
         [types.KeyboardButton(text="💬 Задать вопрос")],
-        [types.KeyboardButton(text="🗑 Очистить историю"), types.KeyboardButton(text="ℹ️ О боте")]
+        [types.KeyboardButton(text="🗑 Очистить историю")]
     ]
     return types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
 def create_inline_keyboard() -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🗑 Очистить историю", callback_data="clear_history"))
-    builder.row(types.InlineKeyboardButton(text="ℹ️ О боте", callback_data="about"))
     return builder.as_markup()
 
 async def ask_ai(user_id: int, message: str) -> str:
@@ -143,8 +142,7 @@ async def main():
             f"Могу ответить на вопросы, помочь с идеями или просто поболтать!\n\n"
             f"<b>Команды:</b>\n"
             f"/start - Запустить бота\n"
-            f"/clear - Очистить историю\n"
-            f"/about - О боте\n\n"
+            f"/clear - Очистить историю\n\n"
             f"Просто отправьте сообщение! 💬"
         )
         await message.answer(text, reply_markup=create_main_keyboard())
@@ -155,45 +153,10 @@ async def main():
         await message.answer("🗑 История очищена!", reply_markup=create_main_keyboard())
         logger.info(f"Пользователь {message.from_user.id} очистил историю")
     
-    @dp.message(Command("about"))
-    async def cmd_about(message: types.Message):
-        ai_client = get_ai_client()
-        stats = ai_client.get_stats()
-        
-        # Описание провайдера
-        if stats['provider'] == 'groq':
-            provider_desc = "Groq (США) 🇺🇸 | Llama 3.1"
-            backup_desc = "Резерв: GigaChat (Россия) 🇷🇺"
-        else:
-            provider_desc = "GigaChat (Россия) 🇷🇺"
-            backup_desc = ""
-        
-        text = (
-            f"<b>🤖 AI ChatBot</b>\n\n"
-            f"Модель: {stats['model']}\n"
-            f"Провайдер: {provider_desc}\n"
-            f"{backup_desc}\n"
-            f"Активных чатов: {len(chat_sessions)}\n\n"
-            f"<i>🇺🇸🇷🇺 Американская + Российская модели</i>"
-        )
-        await message.answer(text)
-
     @dp.callback_query(F.data == "clear_history")
     async def cb_clear(callback: types.CallbackQuery):
         chat_sessions[callback.from_user.id] = []
         await callback.answer("🗑 История очищена!", show_alert=True)
-
-    @dp.callback_query(F.data == "about")
-    async def cb_about(callback: types.CallbackQuery):
-        ai_client = get_ai_client()
-        stats = ai_client.get_stats()
-        
-        if stats['provider'] == 'groq':
-            text = f"<b>AI ChatBot</b>\n\n🇺🇸 Groq (США)\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
-        else:
-            text = f"<b>AI ChatBot</b>\n\n🇷🇺 GigaChat (Россия)\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
-        
-        await callback.message.answer(text)
     
     @dp.message(F.text)
     async def handle_message(message: types.Message):
