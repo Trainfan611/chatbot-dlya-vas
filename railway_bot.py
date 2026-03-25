@@ -1,6 +1,6 @@
 """
 AI ChatBot для Railway - только Telegram бот.
-Использует Google Gemini API.
+Использует GigaChat (Сбер) - работает в РФ!
 """
 
 import asyncio
@@ -25,15 +25,15 @@ logger = logging.getLogger("RailwayBot")
 
 # Проверка переменных
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
 
 if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
     sys.exit(1)
 
-if not GEMINI_API_KEY:
-    logger.error("❌ GEMINI_API_KEY не найден!")
-    logger.info("Получите токен: https://aistudio.google.com/app/apikey")
+if not GIGACHAT_AUTH_KEY:
+    logger.error("❌ GIGACHAT_AUTH_KEY не найден!")
+    logger.info("Получите токен: https://developers.sber.ru/gigachat")
     sys.exit(1)
 
 # Импорты после проверки
@@ -45,10 +45,10 @@ from aiogram.enums import ParseMode
 
 from ai_client import init_ai, get_ai_client
 
-# Инициализация Gemini
-init_ai(provider="gemini", api_key=GEMINI_API_KEY)
+# Инициализация GigaChat
+init_ai(provider="gigachat", auth_key=GIGACHAT_AUTH_KEY)
 ai = get_ai_client()
-logger.info(f"✅ AI модель {ai.model_name} (Gemini) инициализирована")
+logger.info(f"✅ AI модель {ai.model} ({ai.provider}) инициализирована")
 
 # Хранилище сессий
 chat_sessions = {}
@@ -69,10 +69,11 @@ def create_inline_keyboard() -> types.InlineKeyboardMarkup:
     return builder.as_markup()
 
 async def ask_ai(user_id: int, message: str) -> str:
-    """Запрос к AI (Gemini)."""
+    """Запрос к AI (GigaChat)."""
     try:
         client = get_ai_client()
-        return await client.ask(user_id, message, SYSTEM_PROMPT)
+        # GigaChat использует синхронный метод
+        return client.ask(user_id, message, SYSTEM_PROMPT)
     except Exception as e:
         logger.error(f"Ошибка AI: {e}")
         return "Произошла ошибка. Попробуйте позже или используйте /clear"
@@ -100,7 +101,7 @@ async def main():
 
         text = (
             f"👋 <b>Привет, {user.first_name}!</b>\n\n"
-            f"Я AI-бот на базе <b>Google Gemini {model_info['model']}</b> 🤖\n\n"
+            f"Я AI-бот на базе <b>GigaChat (Сбер)</b> 🤖\n\n"
             f"Могу ответить на вопросы, помочь с идеями или просто поболтать!\n\n"
             f"<b>Команды:</b>\n"
             f"/start - Запустить бота\n"
@@ -124,8 +125,9 @@ async def main():
         text = (
             f"<b>🤖 AI ChatBot</b>\n\n"
             f"Модель: {stats['model']}\n"
+            f"Провайдер: {stats['provider']}\n"
             f"Активных чатов: {len(chat_sessions)}\n\n"
-            f"<i>Google Gemini API (бесплатно)</i>"
+            f"<i>GigaChat API (Сбер, РФ)</i>"
         )
         await message.answer(text)
 
@@ -138,7 +140,7 @@ async def main():
     async def cb_about(callback: types.CallbackQuery):
         ai_client = get_ai_client()
         stats = ai_client.get_stats()
-        text = f"<b>AI ChatBot</b>\n\nМодель: {stats['model']}\nЧатов: {len(chat_sessions)}"
+        text = f"<b>AI ChatBot</b>\n\nМодель: {stats['model']}\nПровайдер: {stats['provider']}\nЧатов: {len(chat_sessions)}"
         await callback.message.answer(text)
     
     @dp.message(F.text)
