@@ -43,7 +43,7 @@ from aiogram.enums import ParseMode
 
 from ai_client import init_ai, get_ai_client
 
-# Инициализация AI - GigaChat (основной) + Groq (резерв)
+# Инициализация AI
 if GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
     init_ai(
         provider="gigachat",
@@ -51,19 +51,19 @@ if GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
         client_id=GIGACHAT_CLIENT_ID,
         scope=GIGACHAT_SCOPE
     )
-    logger.info("✅ GigaChat (Россия) инициализирован - основная модель")
+    logger.info("✅ AI модель инициализирована")
 elif GROQ_API_KEY:
     init_ai(
         provider="groq",
         api_key=GROQ_API_KEY
     )
-    logger.info("✅ Groq (США) инициализирован - резервная модель")
+    logger.info("✅ AI модель инициализирована")
 else:
     logger.error("❌ Нет доступных AI моделей!")
     sys.exit(1)
 
 ai = get_ai_client()
-logger.info(f"✅ AI модель {ai.model} ({ai.provider}) активна")
+logger.info(f"✅ AI активна")
 
 # Хранилище сессий
 chat_sessions = {}
@@ -117,16 +117,6 @@ async def main():
     async def cmd_start(message: types.Message):
         user = message.from_user
         logger.info(f"👤 {user.username} запустил бота")
-        
-        # Получаем информацию о модели
-        ai_client = get_ai_client()
-        model_info = ai_client.get_stats()
-        
-        # Определяем описание модели
-        if model_info['provider'] == 'groq':
-            model_desc = "Groq (США) 🇺🇸"
-        else:
-            model_desc = "GigaChat (Россия) 🇷🇺"
 
         text = (
             f"👋 <b>Привет, {user.first_name}!</b>\n\n"
