@@ -147,14 +147,33 @@ async def main():
     
     @dp.message(Command("clear"))
     async def cmd_clear(message: types.Message):
+        # Очищаем историю пользователя
         chat_sessions[message.from_user.id] = []
-        await message.answer("🗑 История очищена!", reply_markup=create_main_keyboard())
+        
+        # Также очищаем в AI клиенте
+        try:
+            ai_client = get_ai_client()
+            ai_client.clear_session(message.from_user.id)
+        except:
+            pass
+        
+        await message.answer("🗑 История чата очищена! Контекст сброшен.", reply_markup=create_main_keyboard())
         logger.info(f"Пользователь {message.from_user.id} очистил историю")
     
     @dp.callback_query(F.data == "clear_history")
     async def cb_clear(callback: types.CallbackQuery):
+        # Очищаем историю пользователя
         chat_sessions[callback.from_user.id] = []
-        await callback.answer("🗑 История очищена!", show_alert=True)
+        
+        # Также очищаем в AI клиенте
+        try:
+            ai_client = get_ai_client()
+            ai_client.clear_session(callback.from_user.id)
+        except:
+            pass
+        
+        await callback.answer("🗑 История и контекст сброшены!", show_alert=True)
+        logger.info(f"Пользователь {callback.from_user.id} очистил историю (кнопка)")
     
     @dp.message(F.text)
     async def handle_message(message: types.Message):
