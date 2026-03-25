@@ -1,6 +1,6 @@
 """
 AI ChatBot для Railway - Telegram бот.
-Использует Groq (США) + GigaChat (Россия) - работает в РФ!
+Использует GigaChat (Россия) + Groq (США) - работает в РФ!
 """
 
 import asyncio
@@ -25,18 +25,13 @@ logger = logging.getLogger("RailwayBot")
 
 # Проверка переменных
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
-    sys.exit(1)
-
-if not GROQ_API_KEY:
-    logger.error("❌ GROQ_API_KEY не найден!")
-    logger.info("Получите ключ: https://console.groq.com/keys")
     sys.exit(1)
 
 # Импорты после проверки
@@ -48,26 +43,24 @@ from aiogram.enums import ParseMode
 
 from ai_client import init_ai, get_ai_client
 
-# Инициализация AI - Groq (основной) + GigaChat (резерв)
-try:
+# Инициализация AI - GigaChat (основной) + Groq (резерв)
+if GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
+    init_ai(
+        provider="gigachat",
+        auth_key=GIGACHAT_AUTH_KEY,
+        client_id=GIGACHAT_CLIENT_ID,
+        scope=GIGACHAT_SCOPE
+    )
+    logger.info("✅ GigaChat (Россия) инициализирован - основная модель")
+elif GROQ_API_KEY:
     init_ai(
         provider="groq",
         api_key=GROQ_API_KEY
     )
-    logger.info("✅ Groq (США) инициализирован - основная модель")
-except Exception as e:
-    logger.warning(f"Groq не доступен: {e}")
-    if GIGACHAT_AUTH_KEY:
-        init_ai(
-            provider="gigachat",
-            auth_key=GIGACHAT_AUTH_KEY,
-            client_id=GIGACHAT_CLIENT_ID,
-            scope=GIGACHAT_SCOPE
-        )
-        logger.info("✅ GigaChat (Россия) инициализирован - резервная модель")
-    else:
-        logger.error("❌ Нет доступных AI моделей!")
-        sys.exit(1)
+    logger.info("✅ Groq (США) инициализирован - резервная модель")
+else:
+    logger.error("❌ Нет доступных AI моделей!")
+    sys.exit(1)
 
 ai = get_ai_client()
 logger.info(f"✅ AI модель {ai.model} ({ai.provider}) активна")
@@ -131,7 +124,7 @@ async def main():
         
         # Определяем описание модели
         if model_info['provider'] == 'groq':
-            model_desc = "Groq (США) 🇺🇸 + GigaChat (Россия) 🇷🇺"
+            model_desc = "Groq (США) 🇺🇸"
         else:
             model_desc = "GigaChat (Россия) 🇷🇺"
 
@@ -184,17 +177,10 @@ async def main():
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        # Groq синхронный, поэтому не используем await
+        # Вызываем AI
         try:
             client = get_ai_client()
-            if client.provider == "groq":
-                response = client._ask_groq(
-                    client.get_session(user.id),
-                    user_text,
-                    SYSTEM_PROMPT
-                )
-            else:
-                response = client.ask(user.id, user_text, SYSTEM_PROMPT)
+            response = client.ask(user.id, user_text, SYSTEM_PROMPT)
         except Exception as e:
             logger.error(f"Ошибка AI: {e}")
             response = "Произошла ошибка. Используйте /clear"
