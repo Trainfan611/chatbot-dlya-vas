@@ -177,10 +177,15 @@ async def main():
 
         await bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        # Вызываем AI
+        # Вызываем AI (синхронно, в executor)
         try:
             client = get_ai_client()
-            response = client.ask(user.id, user_text, SYSTEM_PROMPT)
+            # Запускаем синхронный метод в пуле потоков
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: client.ask(user.id, user_text, SYSTEM_PROMPT)
+            )
         except Exception as e:
             logger.error(f"Ошибка AI: {e}")
             response = "Произошла ошибка. Используйте /clear"
