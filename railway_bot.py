@@ -26,6 +26,8 @@ logger = logging.getLogger("RailwayBot")
 # Проверка переменных
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
+GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
+GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 
 if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
@@ -45,8 +47,13 @@ from aiogram.enums import ParseMode
 
 from ai_client import init_ai, get_ai_client
 
-# Инициализация GigaChat
-init_ai(provider="gigachat", auth_key=GIGACHAT_AUTH_KEY)
+# Инициализация GigaChat с OAuth
+init_ai(
+    provider="gigachat",
+    auth_key=GIGACHAT_AUTH_KEY,
+    client_id=GIGACHAT_CLIENT_ID,
+    scope=GIGACHAT_SCOPE
+)
 ai = get_ai_client()
 logger.info(f"✅ AI модель {ai.model} ({ai.provider}) инициализирована")
 

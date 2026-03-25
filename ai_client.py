@@ -4,6 +4,7 @@
 
 import os
 import logging
+import time
 from typing import Optional, List
 from dataclasses import dataclass, field
 
@@ -26,7 +27,7 @@ class ChatSession:
     history: List[dict] = field(default_factory=list)
     
     def add_message(self, role: str, text: str):
-        self.history.append({"role": role, "parts": [text]})
+        self.history.append({"role": role, "content": text})
         if len(self.history) > 10:
             self.history = self.history[-10:]
     
@@ -49,47 +50,96 @@ class AIClient:
         self._sessions: dict[int, ChatSession] = {}
         
         if provider == "gemini":
-            self.api_key = kwargs.get("api_key", "")
-            if GEMINI_AVAILABLE:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                
-                # Пробуем доступные модели по порядку
-                self.model = None
-                self.model_name = None
-                
-                # Порядок: gemini-pro (стабильная), затем новые
-                for model_name in ["gemini-pro", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
-                    try:
-                        logger.info(f"  Проверяю модель {model_name}...")
-                        self.model = genai.GenerativeModel(model_name)
-                        # Тестовый запрос
-                        test_response = self.model.generate_content("Hi", generation_config=genai.types.GenerationConfig(max_output_tokens=10))
-                        self.model_name = model_name
-                        logger.info(f"✅ Модель {model_name} доступна")
-                        break
-                    except Exception as e:
-                        logger.warning(f"  Модель {model_name} недоступна: {e}")
-                        continue
-                
-                if not self.model_name:
-                    raise ValueError("Ни одна модель Gemini не доступна. Проверьте API ключ.")
-            else:
-                raise ImportError("google-generativeai не установлен")
-                
+            self._init_gemini(kwargs)
         elif provider == "gigachat":
-            self.auth_key = kwargs.get("auth_key", "")
-            self.model = "GigaChat"
-            self.base_url = "https://gigachat.devices.sberbank.ru/api/v2"
-            logger.info(f"✅ GigaChat инициализирован")
-            
+            self._init_gigachat(kwargs)
         elif provider == "groq":
-            self.api_key = kwargs.get("api_key", "")
-            self.model = "llama-3.1-8b-instant"
-            logger.info(f"✅ Groq (Llama 3.1) инициализирован")
-            
+            self._init_groq(kwargs)
         else:
             raise ValueError(f"Неизвестный провайдер: {provider}")
+    
+    def _init_gemini(self, kwargs):
+        """Инициализация Gemini."""
+        self.api_key = kwargs.get("api_key", "")
+        if GEMINI_AVAILABLE:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            
+            self.model = None
+            self.model_name = None
+            
+            for model_name in ["gemini-pro", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
+                try:
+                    logger.info(f"  Проверяю модель {model_name}...")
+                    self.model = genai.GenerativeModel(model_name)
+                    test_response = self.model.generate_content("Hi", generation_config=genai.types.GenerationConfig(max_output_tokens=10))
+                    self.model_name = model_name
+                    logger.info(f"✅ Модель {model_name} доступна")
+                    break
+                except Exception as e:
+                    logger.warning(f"  Модель {model_name} недоступна: {e}")
+                    continue
+            
+            if not self.model_name:
+                raise ValueError("Ни одна модель Gemini не доступна. Проверьте API ключ.")
+        else:
+            raise ImportError("google-generativeai не установлен")
+    
+    def _init_gigachat(self, kwargs):
+        """Инициализация GigaChat."""
+        self.auth_key = kwargs.get("auth_key", "")
+        self.client_id = kwargs.get("client_id", "")
+        self.scope = kwargs.get("scope", "GIGACHAT_API_PERS")
+        self.model = "GigaChat"
+        self.base_url = "https://gigachat.devices.sberbank.ru/api/v2"
+        self._access_token = None
+        self._token_expires = 0
+        logger.info(f"✅ GigaChat инициализирован")
+    
+    def _init_groq(self, kwargs):
+        """Инициализация Groq."""
+        self.api_key = kwargs.get("api_key", "")
+        self.model = "llama-3.1-8b-instant"
+        logger.info(f"✅ Groq (Llama 3.1) инициализирован")
+    
+    def _get_gigachat_token(self) -> str:
+        """Получить access token GigaChat через OAuth."""
+        # Если токен ещё действителен, возвращаем его
+        if self._access_token and time.time() < self._token_expires:
+            return self._access_token
+        
+        try:
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": f"Basic {self.auth_key}"
+            }
+            
+            data = {"scope": self.scope}
+            
+            if self.client_id:
+                data["client_id"] = self.client_id
+            
+            response = requests.post(
+                "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+                headers=headers,
+                data=data,
+                timeout=30,
+                verify=False
+            )
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                self._access_token = token_data["access_token"]
+                self._token_expires = time.time() + 1800
+                logger.info("✅ Получен новый токен GigaChat")
+                return self._access_token
+            else:
+                logger.error(f"Ошибка получения токена: {response.status_code}")
+                return self.auth_key
+                
+        except Exception as e:
+            logger.error(f"Ошибка OAuth: {e}")
+            return self.auth_key
     
     def get_session(self, user_id: int) -> ChatSession:
         if user_id not in self._sessions:
@@ -122,20 +172,13 @@ class AIClient:
         import google.generativeai as genai
         
         try:
-            # Создаём чат с историей
             chat = self.model.start_chat(
                 history=session.history[:-1] if len(session.history) > 1 else None
             )
-            
-            # Отправляем сообщение
             response = await chat.send_message_async(message)
-            answer = response.text
-            
-            return answer
-            
+            return response.text
         except Exception as e:
             logger.error(f"Gemini ошибка: {e}")
-            # Пробуем без истории
             try:
                 response = self.model.generate_content(message)
                 return response.text
@@ -149,8 +192,10 @@ class AIClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.extend(session.history)
         
+        token = self._get_gigachat_token()
+        
         headers = {
-            "Authorization": f"Bearer {self.auth_key}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
         
