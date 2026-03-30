@@ -29,6 +29,7 @@ GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
@@ -44,22 +45,29 @@ from aiogram.enums import ParseMode
 from ai_client import init_ai, get_ai_client
 
 # Инициализация AI
-if GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
+if GEMINI_API_KEY:
+    init_ai(
+        provider="gemini",
+        api_key=GEMINI_API_KEY
+    )
+    logger.info("✅ AI модель инициализирована (Google Gemini)")
+elif GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
     init_ai(
         provider="gigachat",
         auth_key=GIGACHAT_AUTH_KEY,
         client_id=GIGACHAT_CLIENT_ID,
         scope=GIGACHAT_SCOPE
     )
-    logger.info("✅ AI модель инициализирована")
+    logger.info("✅ AI модель инициализирована (GigaChat)")
 elif GROQ_API_KEY:
     init_ai(
         provider="groq",
         api_key=GROQ_API_KEY
     )
-    logger.info("✅ AI модель инициализирована")
+    logger.info("✅ AI модель инициализирована (Groq)")
 else:
     logger.error("❌ Нет доступных AI моделей!")
+    logger.info("Добавьте GEMINI_API_KEY или GIGACHAT_AUTH_KEY в переменные окружения")
     sys.exit(1)
 
 ai = get_ai_client()
