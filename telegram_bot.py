@@ -10,8 +10,12 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from dotenv import load_dotenv
 
 from gemini_client import init_gemini, get_gemini_client
+
+# Загружаем переменные окружения из .env
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(

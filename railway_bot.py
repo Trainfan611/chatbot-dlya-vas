@@ -170,12 +170,8 @@ async def main():
         # Вызываем AI (синхронно, в executor)
         try:
             client = get_ai_client()
-            # Запускаем синхронный метод в пуле потоков
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: client.ask(user.id, user_text, SYSTEM_PROMPT)
-            )
+            # Вызываем асинхронный метод напрямую
+            response = await client.ask(user.id, user_text, SYSTEM_PROMPT)
         except Exception as e:
             logger.error(f"Ошибка AI: {e}")
             response = "Произошла ошибка. Используйте /clear"
