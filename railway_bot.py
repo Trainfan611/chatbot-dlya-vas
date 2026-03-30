@@ -26,6 +26,7 @@ logger = logging.getLogger("RailwayBot")
 # Проверка переменных
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
@@ -49,9 +50,10 @@ from ai_client import init_ai, get_ai_client
 if OPENAI_API_KEY:
     init_ai(
         provider="openai",
-        api_key=OPENAI_API_KEY
+        api_key=OPENAI_API_KEY,
+        model=OPENAI_MODEL
     )
-    logger.info("✅ AI модель инициализирована (OpenAI GPT-4o-mini)")
+    logger.info(f"✅ AI модель инициализирована (OpenAI {OPENAI_MODEL})")
 elif DEEPSEEK_API_KEY:
     init_ai(
         provider="deepseek",

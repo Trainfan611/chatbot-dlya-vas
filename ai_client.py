@@ -112,9 +112,10 @@ class AIClient:
     def _init_openai(self, kwargs):
         """Инициализация OpenAI."""
         self.api_key = kwargs.get("api_key", "")
-        self.model = "gpt-4o-mini"
+        # Оптимальная модель для чат-бота: быстрая, дешёвая, качественная
+        self.model = kwargs.get("model", "gpt-4o-mini")
         self.base_url = "https://api.openai.com/v1"
-        logger.info(f"✅ OpenAI (GPT-4o-mini) инициализирован")
+        logger.info(f"✅ OpenAI ({self.model}) инициализирован")
     
     def _get_gigachat_token(self) -> str:
         """Получить access token GigaChat через OAuth."""
