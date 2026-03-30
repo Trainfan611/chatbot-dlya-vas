@@ -108,6 +108,13 @@ class AIClient:
         self.model = "deepseek-chat"
         self.base_url = "https://api.deepseek.com"
         logger.info(f"✅ DeepSeek инициализирован")
+
+    def _init_openai(self, kwargs):
+        """Инициализация OpenAI."""
+        self.api_key = kwargs.get("api_key", "")
+        self.model = "gpt-4o-mini"
+        self.base_url = "https://api.openai.com/v1"
+        logger.info(f"✅ OpenAI (GPT-4o-mini) инициализирован")
     
     def _get_gigachat_token(self) -> str:
         """Получить access token GigaChat через OAuth."""
@@ -163,7 +170,9 @@ class AIClient:
         session.add_message("user", message)
 
         try:
-            if self.provider == "gemini":
+            if self.provider == "openai":
+                return self._ask_openai(session, message, system_prompt)
+            elif self.provider == "gemini":
                 return await self._ask_gemini(session, message, system_prompt)
             elif self.provider == "gigachat":
                 return self._ask_gigachat(session, message, system_prompt)
@@ -290,6 +299,37 @@ class AIClient:
         else:
             logger.error(f"DeepSeek ошибка: {response.status_code}")
             return f"Ошибка DeepSeek ({response.status_code})"
+
+    def _ask_openai(self, session: ChatSession, message: str, system_prompt: str) -> str:
+        """Запрос к OpenAI."""
+        messages = [{"role": "system", "content": system_prompt}] if system_prompt else []
+        messages.extend(session.history)
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": 0.7
+        }
+
+        response = requests.post(
+            f"{self.base_url}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        else:
+            logger.error(f"OpenAI ошибка: {response.status_code}")
+            return f"Ошибка OpenAI ({response.status_code})"
 
     def get_stats(self) -> dict:
         return {
