@@ -45,7 +45,13 @@ from aiogram.enums import ParseMode
 from ai_client import init_ai, get_ai_client
 
 # Инициализация AI
-if GEMINI_API_KEY:
+if GROQ_API_KEY:
+    init_ai(
+        provider="groq",
+        api_key=GROQ_API_KEY
+    )
+    logger.info("✅ AI модель инициализирована (Groq)")
+elif GEMINI_API_KEY:
     init_ai(
         provider="gemini",
         api_key=GEMINI_API_KEY
@@ -59,15 +65,9 @@ elif GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
         scope=GIGACHAT_SCOPE
     )
     logger.info("✅ AI модель инициализирована (GigaChat)")
-elif GROQ_API_KEY:
-    init_ai(
-        provider="groq",
-        api_key=GROQ_API_KEY
-    )
-    logger.info("✅ AI модель инициализирована (Groq)")
 else:
     logger.error("❌ Нет доступных AI моделей!")
-    logger.info("Добавьте GEMINI_API_KEY или GIGACHAT_AUTH_KEY в переменные окружения")
+    logger.info("Добавьте GROQ_API_KEY или GEMINI_API_KEY в переменные окружения")
     sys.exit(1)
 
 ai = get_ai_client()
