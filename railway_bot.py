@@ -29,6 +29,7 @@ GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "")
 GIGACHAT_CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 if not TELEGRAM_TOKEN:
     logger.error("❌ TELEGRAM_TOKEN не найден!")
@@ -50,6 +51,12 @@ if GROQ_API_KEY:
         api_key=GROQ_API_KEY
     )
     logger.info("✅ AI модель инициализирована (Groq)")
+elif DEEPSEEK_API_KEY:
+    init_ai(
+        provider="deepseek",
+        api_key=DEEPSEEK_API_KEY
+    )
+    logger.info("✅ AI модель инициализирована (DeepSeek)")
 elif GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
     init_ai(
         provider="gigachat",
@@ -60,7 +67,7 @@ elif GIGACHAT_AUTH_KEY and GIGACHAT_CLIENT_ID:
     logger.info("✅ AI модель инициализирована (GigaChat)")
 else:
     logger.error("❌ Нет доступных AI моделей!")
-    logger.info("Добавьте GROQ_API_KEY или GIGACHAT_AUTH_KEY в переменные окружения")
+    logger.info("Добавьте GROQ_API_KEY, DEEPSEEK_API_KEY или GIGACHAT_AUTH_KEY")
     sys.exit(1)
 
 ai = get_ai_client()

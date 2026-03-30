@@ -101,6 +101,13 @@ class AIClient:
         self.api_key = kwargs.get("api_key", "")
         self.model = "llama-3.1-8b-instant"
         logger.info(f"✅ Groq (Llama 3.1) инициализирован")
+
+    def _init_deepseek(self, kwargs):
+        """Инициализация DeepSeek."""
+        self.api_key = kwargs.get("api_key", "")
+        self.model = "deepseek-chat"
+        self.base_url = "https://api.deepseek.com"
+        logger.info(f"✅ DeepSeek инициализирован")
     
     def _get_gigachat_token(self) -> str:
         """Получить access token GigaChat через OAuth."""
@@ -154,7 +161,7 @@ class AIClient:
         """Запрос к AI."""
         session = self.get_session(user_id)
         session.add_message("user", message)
-        
+
         try:
             if self.provider == "gemini":
                 return await self._ask_gemini(session, message, system_prompt)
@@ -162,6 +169,8 @@ class AIClient:
                 return self._ask_gigachat(session, message, system_prompt)
             elif self.provider == "groq":
                 return self._ask_groq(session, message, system_prompt)
+            elif self.provider == "deepseek":
+                return self._ask_deepseek(session, message, system_prompt)
         except Exception as e:
             logger.error(f"Ошибка AI: {e}")
             session.clear_history()
@@ -224,33 +233,64 @@ class AIClient:
         """Запрос к Groq."""
         messages = [{"role": "system", "content": system_prompt}] if system_prompt else []
         messages.extend(session.history)
-        
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        
+
         payload = {
             "model": self.model,
             "messages": messages,
             "max_tokens": 1024,
             "temperature": 0.7
         }
-        
+
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers=headers,
             json=payload,
             timeout=30
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             return data["choices"][0]["message"]["content"]
         else:
             logger.error(f"Groq ошибка: {response.status_code}")
             return f"Ошибка Groq ({response.status_code})"
-    
+
+    def _ask_deepseek(self, session: ChatSession, message: str, system_prompt: str) -> str:
+        """Запрос к DeepSeek."""
+        messages = [{"role": "system", "content": system_prompt}] if system_prompt else []
+        messages.extend(session.history)
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": 0.7
+        }
+
+        response = requests.post(
+            f"{self.base_url}/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        else:
+            logger.error(f"DeepSeek ошибка: {response.status_code}")
+            return f"Ошибка DeepSeek ({response.status_code})"
+
     def get_stats(self) -> dict:
         return {
             "active_sessions": len(self._sessions),
